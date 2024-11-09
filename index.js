@@ -72,8 +72,10 @@ app.post("/api/load-data", upload.single('file'), async (req, res) => {
 // get para los productos
 app.get("/api/items", async (req, res) => {
   try {
+    const query = req.query.q || '';
     const products = await sql`
       SELECT * FROM product
+      WHERE title LIKE ${'%' + query + '%'}
     `;
 
     // Hacemos los inner join para obtener los datos de las tablas relacionadas
@@ -95,18 +97,91 @@ app.get("/api/items", async (req, res) => {
         WHERE product_reviews.product_id = ${product.id}
       `;
 
-      product.reviews = reviews
+      product.reviews = reviews;
     }
-
-
 
     res.json(products);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Internal Server Error" });
   }
-}
-);
+});
+
+//get para el producto
+
+app.get("/api/items/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const products = await sql`
+      SELECT * FROM product
+      WHERE id = ${id}
+    `;
+
+    // Hacemos los inner join para obtener los datos de las tablas relacionadas
+    for (const product of products) {
+      const dimensions = await sql`
+        SELECT * FROM dimension WHERE id = ${product.dimensions_id}
+      `;
+
+      const meta = await sql`
+        SELECT * FROM meta WHERE id = ${product.meta_id}
+      `;
+
+      product.dimensions = dimensions[0];
+      product.meta = meta[0];
+
+      const reviews = await sql`
+        SELECT review.* FROM review
+        INNER JOIN product_reviews ON product_reviews.review_id = review.id
+        WHERE product_reviews.product_id = ${product.id}
+      `;
+
+      product.reviews = reviews;
+    }
+
+    res.json(products[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// post para registrar compras
+app.post("/api/addSale", async (req, res) => {
+
+  try {
+    const { product_id, total } = req.body;
+
+    const sale = await sql`
+      INSERT INTO purchase (product_id, total_price, purchase_date)
+      VALUES (${product_id}, ${total}, NOW())
+    `;
+
+    if (sale) {
+      res.json({ success: true });
+    }
+    else {
+      res.json({ success: false });
+    }
+  }
+  catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+app.get("/api/sales", async (req, res) => {
+  try {
+    const sales = await sql`
+      SELECT * FROM purchase
+    `;
+
+    res.json(sales);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 
 app.listen(port, () => {
   console.log(`Server listening on port ${port}`);
