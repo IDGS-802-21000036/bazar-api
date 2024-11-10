@@ -173,7 +173,9 @@ app.post("/api/addSale", async (req, res) => {
 app.get("/api/sales", async (req, res) => {
   try {
     const sales = await sql`
-      SELECT * FROM purchase
+      SELECT purchase.*, product.title, product.thumbnail
+      FROM purchase
+      INNER JOIN product ON product.id = purchase.product_id
     `;
 
     res.json(sales);
